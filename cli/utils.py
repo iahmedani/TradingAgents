@@ -265,15 +265,24 @@ def select_deep_thinking_agent(provider) -> str:
 def select_llm_provider() -> tuple[str, str]:
     """Select the LLM provider using interactive selection."""
     # Define LLM provider options with their corresponding endpoints
+    import os
+
+    # Check if ANTHROPIC_BASE_URL is set (e.g. via CCS proxy)
+    env_base_url = os.environ.get("ANTHROPIC_BASE_URL")
+
     BASE_URLS = [
-        ("Anthropic", "https://api.anthropic.com/"),
+        ("Anthropic (API)", "https://api.anthropic.com/"),
         ("OpenAI", "https://api.openai.com/v1"),
         ("Google", "https://generativelanguage.googleapis.com/v1"),
         ("xAI", "https://api.x.ai/v1"),
         ("Openrouter", "https://openrouter.ai/api/v1"),
         ("Ollama", "http://localhost:11434/v1"),
     ]
-    
+
+    # If ANTHROPIC_BASE_URL is set, show it as the first option
+    if env_base_url:
+        BASE_URLS.insert(0, (f"Anthropic (Custom: {env_base_url})", env_base_url))
+
     choice = questionary.select(
         "Select your LLM Provider:",
         choices=[
@@ -289,12 +298,17 @@ def select_llm_provider() -> tuple[str, str]:
             ]
         ),
     ).ask()
-    
+
     if choice is None:
         console.print("\n[red]No LLM provider selected. Exiting...[/red]")
         exit(1)
-    
+
     display_name, url = choice
+
+    # Normalize display name for provider matching downstream
+    if display_name.startswith("Anthropic"):
+        display_name = "Anthropic"
+
     print(f"You selected: {display_name}\tURL: {url}")
 
     return display_name, url

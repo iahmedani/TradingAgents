@@ -40,8 +40,11 @@ class AnthropicClient(BaseLLMClient):
         """Return configured ChatAnthropic instance."""
         llm_kwargs = {"model": self.model}
 
-        # Resolve base URL: explicit param > env var > default Anthropic API
-        base_url = self.base_url or os.environ.get("ANTHROPIC_BASE_URL")
+        # Resolve base URL: env var > explicit param > default Anthropic API
+        # ANTHROPIC_BASE_URL takes priority so tools like CCS can override
+        # the hardcoded provider URL from CLI/config.
+        env_base_url = os.environ.get("ANTHROPIC_BASE_URL")
+        base_url = env_base_url or self.base_url
         if base_url:
             llm_kwargs["anthropic_api_url"] = base_url
 
@@ -49,10 +52,15 @@ class AnthropicClient(BaseLLMClient):
             if key in self.kwargs:
                 llm_kwargs[key] = self.kwargs[key]
 
+        # Detect custom (non-default) base URL, e.g. CCS proxy or self-hosted.
+        is_custom_url = env_base_url or (
+            self.base_url and "api.anthropic.com" not in self.base_url
+        )
+
         # When using a custom base URL (account subscription / proxy),
         # the endpoint handles its own auth. If no ANTHROPIC_API_KEY is set,
         # provide a placeholder to satisfy the SDK's validation check.
-        if base_url and "api_key" not in llm_kwargs and not os.environ.get("ANTHROPIC_API_KEY"):
+        if is_custom_url and "api_key" not in llm_kwargs and not os.environ.get("ANTHROPIC_API_KEY"):
             llm_kwargs["api_key"] = "not-needed"
 
         # If ANTHROPIC_AUTH_TOKEN is set, pass it as a Bearer token via
