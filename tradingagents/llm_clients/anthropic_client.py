@@ -1,4 +1,6 @@
 import os
+import time
+import logging
 from typing import Any, Optional
 
 from langchain_anthropic import ChatAnthropic
@@ -6,10 +8,16 @@ from langchain_anthropic import ChatAnthropic
 from .base_client import BaseLLMClient, normalize_content
 from .validators import validate_model
 
+logger = logging.getLogger(__name__)
+
 _PASSTHROUGH_KWARGS = (
     "timeout", "max_retries", "api_key", "max_tokens",
     "callbacks", "http_client", "http_async_client", "effort",
 )
+
+# Retry settings for proxy 500 / connection errors
+_PROXY_RETRY_ATTEMPTS = 3
+_PROXY_RETRY_BASE_DELAY = 5  # seconds
 
 
 class NormalizedChatAnthropic(ChatAnthropic):
@@ -21,7 +29,26 @@ class NormalizedChatAnthropic(ChatAnthropic):
     """
 
     def invoke(self, input, config=None, **kwargs):
-        return normalize_content(super().invoke(input, config, **kwargs))
+        import anthropic
+
+        # Retry with backoff on proxy 500 / connection errors.
+        # The SDK retries internally, but proxy endpoints (CCS) can
+        # fail persistently within a single SDK retry cycle and need
+        # a longer cooldown between attempts.
+        last_exc = None
+        for attempt in range(_PROXY_RETRY_ATTEMPTS):
+            try:
+                return normalize_content(super().invoke(input, config, **kwargs))
+            except anthropic.InternalServerError as exc:
+                last_exc = exc
+                if attempt < _PROXY_RETRY_ATTEMPTS - 1:
+                    delay = _PROXY_RETRY_BASE_DELAY * (2 ** attempt)
+                    logger.warning(
+                        "Proxy returned 500, retrying in %ds (attempt %d/%d): %s",
+                        delay, attempt + 1, _PROXY_RETRY_ATTEMPTS, exc,
+                    )
+                    time.sleep(delay)
+        raise last_exc
 
 
 class AnthropicClient(BaseLLMClient):
