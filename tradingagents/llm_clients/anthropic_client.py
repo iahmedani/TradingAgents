@@ -63,6 +63,11 @@ class AnthropicClient(BaseLLMClient):
         if is_custom_url and "api_key" not in llm_kwargs and not os.environ.get("ANTHROPIC_API_KEY"):
             llm_kwargs["api_key"] = "not-needed"
 
+        # Increase retries for proxy endpoints (CCS, etc.) which are more
+        # prone to transient 500 / connection-reset errors.
+        if is_custom_url and "max_retries" not in llm_kwargs:
+            llm_kwargs["max_retries"] = 5
+
         # If ANTHROPIC_AUTH_TOKEN is set, pass it as a Bearer token via
         # default_headers for endpoints that require token authentication.
         auth_token = os.environ.get("ANTHROPIC_AUTH_TOKEN")
