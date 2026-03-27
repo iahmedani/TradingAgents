@@ -130,9 +130,10 @@ export OPENROUTER_API_KEY=...      # OpenRouter
 export ALPHA_VANTAGE_API_KEY=...   # Alpha Vantage
 ```
 
-To use a Claude account subscription (or proxy) instead of a direct API key, set a custom base URL:
+To use a Claude account subscription (or proxy) instead of a direct API key, set a custom base URL and auth token:
 ```bash
 export ANTHROPIC_BASE_URL=https://your-custom-endpoint.example.com
+export ANTHROPIC_AUTH_TOKEN=your-auth-token
 ```
 
 For local models, configure Ollama with `llm_provider: "ollama"` in your config.
