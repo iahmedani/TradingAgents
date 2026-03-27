@@ -49,17 +49,18 @@ class AnthropicClient(BaseLLMClient):
             if key in self.kwargs:
                 llm_kwargs[key] = self.kwargs[key]
 
-        # Support auth_token for account subscription authentication.
-        # When ANTHROPIC_AUTH_TOKEN is set, use it as a Bearer token via
-        # default_headers, which bypasses the SDK's api_key requirement.
+        # When using a custom base URL (account subscription / proxy),
+        # the endpoint handles its own auth. If no ANTHROPIC_API_KEY is set,
+        # provide a placeholder to satisfy the SDK's validation check.
+        if base_url and "api_key" not in llm_kwargs and not os.environ.get("ANTHROPIC_API_KEY"):
+            llm_kwargs["api_key"] = "not-needed"
+
+        # If ANTHROPIC_AUTH_TOKEN is set, pass it as a Bearer token via
+        # default_headers for endpoints that require token authentication.
         auth_token = os.environ.get("ANTHROPIC_AUTH_TOKEN")
-        if auth_token and "api_key" not in llm_kwargs:
-            llm_kwargs["default_headers"] = {
-                "Authorization": f"Bearer {auth_token}",
-            }
-            # Set a placeholder api_key to satisfy SDK validation;
-            # the Authorization header takes precedence for actual auth.
-            llm_kwargs["api_key"] = "sk-ant-placeholder"
+        if auth_token:
+            llm_kwargs.setdefault("default_headers", {})
+            llm_kwargs["default_headers"]["Authorization"] = f"Bearer {auth_token}"
 
         return NormalizedChatAnthropic(**llm_kwargs)
 
